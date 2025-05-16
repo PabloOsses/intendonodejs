@@ -74,6 +74,59 @@ app.post('/auth/login', async (req, res) => {
         res.status(500).json({ error: 'Error en el servidor al autenticar' });
     }
 });
+// Endpoint para registrar nuevos usuarios
+app.post('/auth/register', async (req, res) => {
+    try {
+        const { nombre_usuario, email, contrasena } = req.body;
+
+        // Validar que todos los campos requeridos estén presentes
+        if (!nombre_usuario || !email || !contrasena) {
+            return res.status(400).json({ 
+                error: 'Todos los campos son requeridos: nombre_usuario, email, contrasena' 
+            });
+        }
+
+        // Verificar si el email ya está registrado
+        const { data: existingUser, error: emailError } = await supabase
+            .from('usuario')
+            .select('email')
+            .eq('email', email)
+            .single();
+
+        if (existingUser) {
+            return res.status(409).json({ 
+                error: 'El email ya está registrado' 
+            });
+        }
+
+        // Insertar el nuevo usuario en la base de datos
+        const { data: newUser, error: insertError } = await supabase
+            .from('usuario')
+            .insert([
+                { 
+                    nombre_usuario: nombre_usuario,
+                    email: email,
+                    contrasena: contrasena // IMPORTANTE: En producción deberías hashear la contraseña
+                }
+            ])
+            .select('id_usuario, nombre_usuario, email, fecha_registro');
+
+        if (insertError) throw insertError;
+
+        // Devolver los datos del nuevo usuario (sin la contraseña)
+        res.status(201).json({
+            message: 'Usuario registrado exitosamente',
+            usuario: newUser[0]
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ 
+            error: 'Error al registrar el usuario',
+            details: error.message 
+        });
+    }
+});
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
