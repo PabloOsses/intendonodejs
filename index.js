@@ -127,6 +127,35 @@ app.post('/auth/register', async (req, res) => {
         });
     }
 });
+app.get('/ranking', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('ranking_global')
+            .select('*')
+            .order('puntuacion_total', { ascending: false });
+
+        if (error) throw error;
+        res.json(data);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error al obtener el ranking global' });
+    }
+});
+
+// Nuevo endpoint: Obtener mejores puntuaciones por nivel
+app.get('/mejores-puntuaciones', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('mejores_puntuaciones_nivel')
+            .select('*');
+
+        if (error) throw error;
+        res.json(data);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error al obtener las mejores puntuaciones' });
+    }
+});
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
