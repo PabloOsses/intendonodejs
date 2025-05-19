@@ -156,6 +156,53 @@ app.get('/mejores-puntuaciones', async (req, res) => {
         res.status(500).json({ error: 'Error al obtener las mejores puntuaciones' });
     }
 });
+// Endpoint para obtener puntaje total por email
+app.get('/puntaje-usuario', async (req, res) => {
+    try {
+        const { email } = req.query;
+
+        // Validar que se proporcionó el email
+        if (!email) {
+            return res.status(400).json({ error: 'El parámetro email es requerido' });
+        }
+
+        // Consultar el usuario por email
+        const { data: usuario, error: usuarioError } = await supabase
+            .from('usuario')
+            .select('id_usuario, nombre_usuario, email')
+            .eq('email', email)
+            .single();
+
+        if (usuarioError) throw usuarioError;
+        if (!usuario) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+
+        // Consultar el ranking global para obtener el puntaje
+        const { data: ranking, error: rankingError } = await supabase
+            .from('ranking_global')
+            .select('puntuacion_total')
+            .eq('id_usuario', usuario.id_usuario)
+            .single();
+
+        if (rankingError) throw rankingError;
+
+        // Respuesta exitosa
+        res.json({
+            id_usuario: usuario.id_usuario,
+            nombre_usuario: usuario.nombre_usuario,
+            email: usuario.email,
+            puntuacion_total: ranking?.puntuacion_total || 0
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ 
+            error: 'Error al obtener el puntaje del usuario',
+            details: error.message 
+        });
+    }
+});
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
