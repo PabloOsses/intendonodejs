@@ -203,6 +203,144 @@ app.get('/puntaje-usuario', async (req, res) => {
         });
     }
 });
+// Endpoint para obtener logros de usuario
+app.get('/logros-usuario', async (req, res) => {
+    try {
+        const { email } = req.query;
+
+        // Validar que se proporcionó el email
+        if (!email) {
+            return res.status(400).json({ error: 'El parámetro email es requerido' });
+        }
+
+        // 1. Obtener el ID del usuario a partir del email
+        const { data: usuario, error: usuarioError } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('email', email)
+            .single();
+
+        if (usuarioError) throw usuarioError;
+        if (!usuario) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+
+        // 2. Obtener TODOS los logros disponibles
+        const { data: todosLogros, error: logrosError } = await supabase
+            .from('logro')
+            .select('id_logro, nombre_logro');
+
+        if (logrosError) throw logrosError;
+
+        // 3. Obtener los logros desbloqueados por el usuario
+        const { data: logrosDesbloqueados, error: desbloqueadosError } = await supabase
+            .from('usuario_logro')
+            .select('id_logro')
+            .eq('id_usuario', usuario.id_usuario);
+
+        if (desbloqueadosError) throw desbloqueadosError;
+
+        // Crear un Set con los IDs de logros desbloqueados para búsqueda rápida
+        const desbloqueadosSet = new Set(logrosDesbloqueados.map(l => l.id_logro));
+
+        // 4. Construir la respuesta con todos los logros y su estado
+        const respuesta = todosLogros.map(logro => ({
+            id_logro: logro.id_logro,
+            nombre_logro: logro.nombre_logro,
+            desbloqueado: desbloqueadosSet.has(logro.id_logro)
+        }));
+
+        res.json(respuesta);
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ 
+            error: 'Error al obtener los logros del usuario',
+            details: error.message 
+        });
+    }
+});
+// Endpoint para desbloquear un logro para un usuario
+app.post('/desbloquear-logro', async (req, res) => {
+    try {
+        const { email, id_logro } = req.body;
+
+        // Validar que se proporcionaron los datos requeridos
+        if (!email || !id_logro) {
+            return res.status(400).json({ 
+                error: 'Los campos email e id_logro son requeridos' 
+            });
+        }
+
+        // 1. Obtener el ID del usuario a partir del email
+        const { data: usuario, error: usuarioError } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('email', email)
+            .single();
+
+        if (usuarioError) throw usuarioError;
+        if (!usuario) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+
+        // 2. Verificar que el logro existe
+        const { data: logro, error: logroError } = await supabase
+            .from('logro')
+            .select('id_logro')
+            .eq('id_logro', id_logro)
+            .single();
+
+        if (logroError) throw logroError;
+        if (!logro) {
+            return res.status(404).json({ error: 'Logro no encontrado' });
+        }
+
+        // 3. Verificar si el usuario ya tiene el logro
+        const { data: logroExistente, error: existenteError } = await supabase
+            .from('usuario_logro')
+            .select('id_logro')
+            .eq('id_usuario', usuario.id_usuario)
+            .eq('id_logro', id_logro)
+            .single();
+
+        if (existenteError && existenteError.code !== 'PGRST116') throw existenteError;
+        
+        if (logroExistente) {
+            return res.status(409).json({ 
+                error: 'El usuario ya tiene este logro desbloqueado',
+                id_usuario: usuario.id_usuario,
+                id_logro: id_logro
+            });
+        }
+
+        // 4. Insertar el nuevo registro en usuario_logro
+        const { data: nuevoLogro, error: insertError } = await supabase
+            .from('usuario_logro')
+            .insert([
+                { 
+                    id_usuario: usuario.id_usuario,
+                    id_logro: id_logro
+                }
+            ])
+            .select();
+
+        if (insertError) throw insertError;
+
+        // 5. Respuesta exitosa
+        res.status(201).json({
+            message: 'Logro desbloqueado exitosamente',
+            logro_desbloqueado: nuevoLogro[0]
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ 
+            error: 'Error al desbloquear el logro',
+            details: error.message 
+        });
+    }
+});
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
