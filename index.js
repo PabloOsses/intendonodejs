@@ -341,6 +341,126 @@ app.post('/desbloquear-logro', async (req, res) => {
         });
     }
 });
+app.get('/configuracion-usuario', async (req, res) => {
+    try {
+        const { email } = req.query;
+
+        // Validar que se proporcionó el email
+        if (!email) {
+            return res.status(400).json({ 
+                error: 'El parámetro email es requerido' 
+            });
+        }
+
+        // 1. Obtener el ID del usuario a partir del email
+        const { data: usuario, error: usuarioError } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('email', email)
+            .single();
+
+        if (usuarioError) throw usuarioError;
+        if (!usuario) {
+            return res.status(404).json({ 
+                error: 'Usuario no encontrado' 
+            });
+        }
+
+        // 2. Obtener la configuración del usuario
+        const { data: configuracion, error: configError } = await supabase
+            .from('configuracion_usuario')
+            .select(`
+                volumen_musica,
+                volumen_efectos,
+                dificultad
+            `)
+            .eq('id_usuario', usuario.id_usuario)
+            .single();
+
+        if (configError && configError.code !== 'PGRST116') throw configError;
+
+        // Si no existe configuración, devolver valores por defecto
+        if (!configuracion) {
+            return res.json({
+                volumen_musica: 1.0,
+                volumen_efectos: 1.0,
+                dificultad: 'facil',
+                mensaje: usuario.id_usuario
+            });
+        }
+
+        // 3. Devolver la configuración encontrada
+        res.json(configuracion);
+
+    } catch (error) {
+        console.error('Error en /configuracion-usuario:', error);
+        res.status(500).json({ 
+            error: 'Error al obtener la configuración del usuario',
+            details: error.message 
+        });
+    }
+});
+app.put('/actualizar-configuracion', async (req, res) => {
+    try {
+        const { email, volumen_musica, volumen_efectos, dificultad } = req.body;
+
+        // Validaciones básicas
+        if (!email) {
+            return res.status(400).json({ 
+                error: 'El campo email es requerido' 
+            });
+        }
+
+        if (dificultad && !['facil', 'medio', 'dificil'].includes(dificultad)) {
+            return res.status(400).json({ 
+                error: 'Dificultad no válida' 
+            });
+        }
+
+        // 1. Obtener el ID del usuario
+        const { data: usuario, error: usuarioError } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('email', email)
+            .single();
+
+        if (usuarioError) throw usuarioError;
+        if (!usuario) {
+            return res.status(404).json({ 
+                error: 'Usuario no encontrado' 
+            });
+        }
+
+        // 2. Preparar los datos de actualización
+        const updates = {
+            id_usuario: usuario.id_usuario // Asegurarse de incluir esto
+        };
+        
+        if (volumen_musica !== undefined) updates.volumen_musica = parseFloat(volumen_musica);
+        if (volumen_efectos !== undefined) updates.volumen_efectos = parseFloat(volumen_efectos);
+        if (dificultad) updates.dificultad = dificultad;
+
+        // 3. Upsert explicando la columna de conflicto
+        const { data, error } = await supabase
+            .from('configuracion_usuario')
+            .upsert(updates, { onConflict: 'id_usuario' })
+            .select();
+
+        if (error) throw error;
+
+        res.json({
+            mensaje: 'Configuración actualizada exitosamente',
+            configuracion: data[0]
+        });
+
+    } catch (error) {
+        console.error('Error en /actualizar-configuracion:', error);
+        res.status(500).json({ 
+            error: 'Error al actualizar la configuración',
+            details: error.message 
+        });
+    }
+});
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
