@@ -461,6 +461,100 @@ app.put('/actualizar-configuracion', async (req, res) => {
         });
     }
 });
+// Endpoint para acumular puntuación
+app.post('/acumular-puntuacion', async (req, res) => {
+    try {
+        const { email, id_nivel, puntos } = req.body;
+
+        // Validar datos de entrada
+        if (!email || !id_nivel || puntos === undefined) {
+            return res.status(400).json({ 
+                error: 'Los campos email, id_nivel y puntos son requeridos' 
+            });
+        }
+
+        if (isNaN(puntos) || puntos < 0) {
+            return res.status(400).json({ 
+                error: 'Los puntos deben ser un número positivo' 
+            });
+        }
+
+        // 1. Obtener el ID del usuario a partir del email
+        const { data: usuario, error: usuarioError } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('email', email)
+            .single();
+
+        if (usuarioError) throw usuarioError;
+        if (!usuario) {
+            return res.status(404).json({ 
+                error: 'Usuario no encontrado' 
+            });
+        }
+
+        // 2. Verificar que el nivel existe
+        const { data: nivel, error: nivelError } = await supabase
+            .from('nivel')
+            .select('id_nivel')
+            .eq('id_nivel', id_nivel)
+            .single();
+
+        if (nivelError) throw nivelError;
+        if (!nivel) {
+            return res.status(404).json({ 
+                error: 'Nivel no encontrado' 
+            });
+        }
+
+        // 3. Obtener la puntuación actual si existe
+        const { data: puntuacionActual, error: puntuacionError } = await supabase
+            .from('puntuacion')
+            .select('puntos')
+            .eq('id_usuario', usuario.id_usuario)
+            .eq('id_nivel', id_nivel)
+            .single();
+
+        if (puntuacionError && puntuacionError.code !== 'PGRST116') throw puntuacionError;
+
+        const nuevosPuntos = puntuacionActual ? 
+            parseInt(puntuacionActual.puntos) + parseInt(puntos) : 
+            parseInt(puntos);
+
+        // 4. Insertar o actualizar la puntuación
+        const { data: nuevaPuntuacion, error: upsertError } = await supabase
+            .from('puntuacion')
+            .upsert({
+                id_usuario: usuario.id_usuario,
+                id_nivel: id_nivel,
+                puntos: nuevosPuntos,
+                fecha: new Date().toISOString() // Actualizar la fecha
+            }, {
+                onConflict: 'id_usuario,id_nivel'
+            })
+            .select();
+
+        if (upsertError) throw upsertError;
+
+        // 5. Respuesta exitosa
+        res.status(200).json({
+            message: 'Puntuación acumulada exitosamente',
+            id_usuario: usuario.id_usuario,
+            id_nivel: id_nivel,
+            puntos_anteriores: puntuacionActual?.puntos || 0,
+            puntos_agregados: parseInt(puntos),
+            puntos_totales: nuevosPuntos,
+            puntuacion: nuevaPuntuacion[0]
+        });
+
+    } catch (error) {
+        console.error('Error en /acumular-puntuacion:', error);
+        res.status(500).json({ 
+            error: 'Error al acumular la puntuación',
+            details: error.message 
+        });
+    }
+});
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
