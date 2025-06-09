@@ -710,11 +710,7 @@ app.post('/auth/olvide-contrasena', async (req, res) => {
     });
   }
 });
-console.log('Variables:', {
-  user: process.env.GMAIL_USER,
-  pass: process.env.GMAIL_PASSWORD ? '***' : 'undefined',
-  env: process.env.NODE_ENV
-});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
