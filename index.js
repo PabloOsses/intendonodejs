@@ -2,18 +2,40 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
+import nodemailer from 'nodemailer';
+import crypto from 'crypto';
+
 // Configurar variables de entorno
 dotenv.config();
 
 // Configurar el cliente de Supabase
-const supabaseUrl = 'https://rgyntyarllwnycgugrqq.supabase.co'; // URL de tu proyecto Supabase
-const supabaseKey = process.env.SUPABASE_KEY; // Tu clave de API desde .env
+const supabaseUrl = 'https://rgyntyarllwnycgugrqq.supabase.co'; 
+const supabaseKey = process.env.SUPABASE_KEY; 
 const supabase = createClient(supabaseUrl, supabaseKey);
 const SECRET_KEY = process.env.SECRET_KEY;
 // Inicializar Express
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const emailTransporter = nodemailer.createTransport(
+  process.env.NODE_ENV === 'production'
+    ? {
+        service: 'gmail',
+        auth: {
+          user: process.env.GMAIL_USER,
+          pass: process.env.GMAIL_PASSWORD
+        }
+      }
+    : {
+        host: "sandbox.smtp.mailtrap.io",
+        port: 2525,
+        auth: {
+          user: process.env.MAILTRAP_USER,
+          pass: process.env.MAILTRAP_PASS
+        }
+      }
+);
 
 // Ruta de prueba
 app.get('/', (req, res) => {
@@ -554,6 +576,144 @@ app.post('/acumular-puntuacion', async (req, res) => {
             details: error.message 
         });
     }
+});
+// Añade esta función para generar contraseña provisional
+function generarContrasenaProvisional() {
+  const caracteres = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let contrasena = '';
+  for (let i = 0; i < 7; i++) {
+    contrasena += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+  }
+  return contrasena;
+}
+function hashPassword(password) {
+  // Crear hash SHA-256 (igual que en Godot)
+  const hash = crypto.createHash('sha256');
+  hash.update(password);
+  return hash.digest('hex');
+}
+
+app.post('/auth/olvide-contrasena', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    // Validar que se proporcionó el email
+    if (!email) {
+      return res.status(400).json({ error: 'El email es requerido' });
+    }
+
+    // Verificar si el usuario existe en la base de datos
+    const { data: user, error: userError } = await supabase
+      .from('usuario')
+      .select('id_usuario')
+      .eq('email', email)
+      .single();
+
+    // Si hay error o no existe el usuario, devolver misma respuesta por seguridad
+    if (userError || !user) {
+      return res.json({ 
+        message: 'Si el email existe, se ha enviado una nueva contraseña provisional' 
+      });
+    }
+
+    // Generar contraseña provisional de 8 caracteres alfanuméricos
+    const contrasenaProvisional = Math.random().toString(36).slice(2, 10);
+    const hashedPassword = hashPassword(contrasenaProvisional);
+
+    // Actualizar solo la contraseña en la base de datos
+    const { error: updateError } = await supabase
+      .from('usuario')
+      .update({ 
+        contrasena: hashedPassword 
+      })
+      .eq('email', email);
+
+    if (updateError) throw updateError;
+
+    // Configuración del transporter condicional
+    const transporter = nodemailer.createTransport(
+      process.env.NODE_ENV === 'production'
+        ? {
+            service: 'gmail',
+            auth: {
+              user: process.env.GMAIL_USER,
+              pass: process.env.GMAIL_PASSWORD
+            }
+          }
+        : {
+            host: "sandbox.smtp.mailtrap.io",
+            port: 2525,
+            auth: {
+              user: process.env.MAILTRAP_USER,
+              pass: process.env.MAILTRAP_PASS
+            }
+          }
+    );
+
+    // Configurar y enviar el email
+    const mailOptions = {
+      from: process.env.NODE_ENV === 'production'
+        ? `"Soporte de Menti Activa" <${process.env.GMAIL_USER}>`
+        : '"Soporte de Menti Activa (Pruebas)" <no-reply@mentiactiva.com>',
+      to: email,
+      subject: 'Tu contraseña provisional - Menti Activa',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <h2 style="color: #2b6cb0; text-align: center;">Recuperación de Contraseña</h2>
+          <p style="font-size: 16px;">Hemos generado una contraseña provisional para tu cuenta:</p>
+          
+          <div style="background: #f7fafc; padding: 15px; margin: 20px 0; border-radius: 6px; text-align: center; font-size: 18px;">
+            <strong>${contrasenaProvisional}</strong>
+          </div>
+          
+          <p style="font-size: 14px; color: #4a5568;">Por seguridad, te recomendamos:</p>
+          <ol style="font-size: 14px; color: #4a5568; padding-left: 20px;">
+            <li>Iniciar sesión con esta contraseña</li>
+            <li>Ir a tu perfil</li>
+            <li>Cambiarla inmediatamente por una personalizada</li>
+          </ol>
+          
+          <p style="font-size: 14px; color: #718096; margin-top: 30px;">
+            Si no solicitaste este cambio, por favor ignora este mensaje o contacta a nuestro equipo.
+          </p>
+        </div>
+      `,
+      text: `Recuperación de Contraseña - Menti Activa\n\n` +
+            `Tu contraseña provisional es: ${contrasenaProvisional}\n\n` +
+            `Por seguridad, te recomendamos:\n` +
+            `1. Iniciar sesión con esta contraseña\n` +
+            `2. Ir a tu perfil\n` +
+            `3. Cambiarla inmediatamente por una personalizada\n\n` +
+            `Si no solicitaste este cambio, por favor ignora este mensaje.`
+    };
+
+    // Enviar el email
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`Email enviado (${process.env.NODE_ENV}):`, info.messageId, 'a:', email);
+    
+    // Responder al cliente
+    res.json({ 
+      message: 'Si el email existe, se ha enviado una nueva contraseña provisional' 
+    });
+
+  } catch (error) {
+    console.error('Error en recuperación de contraseña:', {
+      error: error.message,
+      email: req.body.email,
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV
+    });
+    
+    res.status(500).json({ 
+      error: 'Error al procesar la solicitud de recuperación',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+console.log('Variables:', {
+  user: process.env.GMAIL_USER,
+  pass: process.env.GMAIL_PASSWORD ? '***' : 'undefined',
+  env: process.env.NODE_ENV
 });
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
