@@ -593,6 +593,17 @@ function hashPassword(password) {
   return hash.digest('hex');
 }
 
+
+// Configuración de MailTrap
+const transporter = nodemailer.createTransport({
+  host: process.env.MAILTRAP_HOST,
+  port: process.env.MAILTRAP_PORT,
+  auth: {
+    user: process.env.MAILTRAP_USER,
+    pass: process.env.MAILTRAP_PASS
+  }
+});
+
 app.post('/auth/olvide-contrasena', async (req, res) => {
   try {
     const { email } = req.body;
@@ -630,31 +641,9 @@ app.post('/auth/olvide-contrasena', async (req, res) => {
 
     if (updateError) throw updateError;
 
-    // Configuración del transporter condicional
-    const transporter = nodemailer.createTransport(
-      process.env.NODE_ENV === 'production'
-        ? {
-            service: 'gmail',
-            auth: {
-              user: process.env.GMAIL_USER,
-              pass: process.env.GMAIL_PASSWORD
-            }
-          }
-        : {
-            host: "sandbox.smtp.mailtrap.io",
-            port: 2525,
-            auth: {
-              user: process.env.MAILTRAP_USER,
-              pass: process.env.MAILTRAP_PASS
-            }
-          }
-    );
-
-    // Configurar y enviar el email
+    // Configurar y enviar el email con MailTrap
     const mailOptions = {
-      from: process.env.NODE_ENV === 'production'
-        ? `"Soporte de Menti Activa" <${process.env.GMAIL_USER}>`
-        : '"Soporte de Menti Activa (Pruebas)" <no-reply@mentiactiva.com>',
+      from: '"Soporte de Menti Activa" <no-reply@mentiactiva.com>',
       to: email,
       subject: 'Tu contraseña provisional - Menti Activa',
       html: `
@@ -687,9 +676,9 @@ app.post('/auth/olvide-contrasena', async (req, res) => {
             `Si no solicitaste este cambio, por favor ignora este mensaje.`
     };
 
-    // Enviar el email
     const info = await transporter.sendMail(mailOptions);
-    console.log(`Email enviado (${process.env.NODE_ENV}):`, info.messageId, 'a:', email);
+    
+    console.log(`Email enviado con MailTrap (${process.env.NODE_ENV}):`, info.messageId, 'a:', email);
     
     // Responder al cliente
     res.json({ 
