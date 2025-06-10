@@ -710,7 +710,129 @@ app.post('/auth/olvide-contrasena', async (req, res) => {
     });
   }
 });
+// Endpoint para verificar si un email existe
+app.get('/verificar-email', async (req, res) => {
+    try {
+        const { email } = req.query;
 
+        // Validar que se proporcionó el email
+        if (!email) {
+            return res.status(400).json({ error: 'El parámetro email es requerido' });
+        }
+
+        // Consultar la base de datos
+        const { data: usuario, error } = await supabase
+            .from('usuario')
+            .select('email')
+            .eq('email', email)
+            .single();
+
+        if (error) throw error;
+
+        // Devolver true si existe, false si no
+        res.json({
+            email: email,
+            existe: !!usuario
+        });
+
+    } catch (error) {
+        console.error('Error en /verificar-email:', error);
+        res.status(500).json({ 
+            error: 'Error al verificar el email',
+            details: error.message 
+        });
+    }
+});
+// Endpoint para verificar credenciales
+app.post('/verificar-credenciales', async (req, res) => {
+    try {
+        const { email, contrasena } = req.body;
+
+        // Validar que se proporcionaron ambos campos
+        if (!email || !contrasena) {
+            return res.status(400).json({ 
+                error: 'Email y contraseña son requeridos' 
+            });
+        }
+
+        // Buscar usuario en la base de datos
+        const { data: usuario, error } = await supabase
+            .from('usuario')
+            .select('contrasena')
+            .eq('email', email)
+            .single();
+
+        if (error && error.code !== 'PGRST116') throw error;
+        
+        // Verificar si el usuario existe y la contraseña coincide
+        const credencialesValidas = usuario && usuario.contrasena === contrasena;
+
+        res.json({
+            email: email,
+            credencialesValidas: credencialesValidas
+        });
+
+    } catch (error) {
+        console.error('Error en /verificar-credenciales:', error);
+        res.status(500).json({ 
+            error: 'Error al verificar las credenciales',
+            details: error.message 
+        });
+    }
+});
+// Endpoint para actualizar contraseña (recibe hash desde la app)
+// Endpoint para actualizar contraseña (adaptado a tu estructura de tabla)
+// Endpoint para actualizar contraseña (adaptado a tu estructura de tabla)
+app.put('/actualizar-contrasena', async (req, res) => {
+    try {
+        const { email, contrasenaHash } = req.body;
+
+        // Validación básica
+        if (!email || !contrasenaHash) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'Se requieren email y hash de contraseña'
+            });
+        }
+
+        // Verificar primero si el usuario existe
+        const { data: usuarioExistente, error: errorVerificacion } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('email', email)
+            .single();
+
+        if (errorVerificacion || !usuarioExistente) {
+            return res.status(200).json({
+                success: false,
+                message: 'No se encontró usuario con ese email'
+            });
+        }
+
+        // Actualización directa del hash en la base de datos
+        const { error } = await supabase
+            .from('usuario')
+            .update({ 
+                contrasena: contrasenaHash
+                // No actualizamos fecha_registro porque es DEFAULT NOW()
+            })
+            .eq('email', email);
+
+        if (error) throw error;
+
+        res.json({
+            success: true,
+            message: 'Contraseña actualizada exitosamente'
+        });
+
+    } catch (error) {
+        console.error('Error en actualizar-contrasena:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'Error interno al actualizar contraseña'
+        });
+    }
+});
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
