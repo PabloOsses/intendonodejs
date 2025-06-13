@@ -5,15 +5,16 @@ import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 
-// Configurar variables de entorno
+// variables de entorno
 dotenv.config();
 
-// Configurar el cliente de Supabase
+//  cliente de Supabase
 const supabaseUrl = 'https://rgyntyarllwnycgugrqq.supabase.co'; 
 const supabaseKey = process.env.SUPABASE_KEY; 
 const supabase = createClient(supabaseUrl, supabaseKey);
 const SECRET_KEY = process.env.SECRET_KEY;
-// Inicializar Express
+
+// aqui esta Express
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -37,12 +38,12 @@ const emailTransporter = nodemailer.createTransport(
       }
 );
 
-// Ruta de prueba
+// ruta de prueba
 app.get('/', (req, res) => {
-    res.send('API funcionando correctamente 🚀');
+    res.send('API funcionando correctamente');
 });
 
-// Ruta para obtener usuarios
+// ruta de pruebas para ver lista de usuarios
 app.get('/usuarios', async (req, res) => {
     try {
         const { data, error } = await supabase
@@ -56,16 +57,17 @@ app.get('/usuarios', async (req, res) => {
         res.status(500).json({ error: 'Error al obtener usuarios' });
     }
 });
+//enpoint del lgoin
 app.post('/auth/login', async (req, res) => {
     try {
         const { email, contrasena } = req.body;
 
-        // Validar que se proporcionen email y contraseña
+        // hay contraseña y email ?
         if (!email || !contrasena) {
             return res.status(400).json({ error: 'Email y contraseña son requeridos' });
         }
 
-        // Buscar usuario en la base de datos
+        // se busca el usuario en la base de datos
         const { data: usuario, error } = await supabase
             .from('usuario')
             .select('id_usuario, contrasena')
@@ -74,18 +76,17 @@ app.post('/auth/login', async (req, res) => {
 
         if (error) throw error;
         
-        // Verificar si el usuario existe
+        // en caso de que el usuario no exista
         if (!usuario) {
             return res.status(404).json({ error: 'Usuario no encontrado' });
         }
 
-        // IMPORTANTE: En una aplicación real, deberías usar bcrypt para comparar contraseñas hasheadas
-        // Aquí estoy haciendo una comparación directa solo como ejemplo
+        //  comparacion entre contraseñas
         if (usuario.contrasena !== contrasena) {
             return res.status(401).json({ error: 'Credenciales inválidas' });
         }
 
-        // Si todo es correcto, devolver el id del usuario
+        // si todo es correcto se debolvera el id del usuario
         res.json({ 
             id_usuario: usuario.id_usuario,
             message: 'Autenticación exitosa'
@@ -96,46 +97,46 @@ app.post('/auth/login', async (req, res) => {
         res.status(500).json({ error: 'Error en el servidor al autenticar' });
     }
 });
-// Endpoint para registrar nuevos usuarios
+// endpoint para registrar nuevos usuarios
 app.post('/auth/register', async (req, res) => {
     try {
         const { nombre_usuario, email, contrasena } = req.body;
 
-        // Validar que todos los campos requeridos estén presentes
+        //hay nombre , mail y contraseña?
         if (!nombre_usuario || !email || !contrasena) {
             return res.status(400).json({ 
                 error: 'Todos los campos son requeridos: nombre_usuario, email, contrasena' 
             });
         }
 
-        // Verificar si el email ya está registrado
+        // todo paso a paso, primero ver si la cuenta ya existe
         const { data: existingUser, error: emailError } = await supabase
             .from('usuario')
             .select('email')
             .eq('email', email)
             .single();
-
+        //si existe se va a esta parte del codigo y hay return
         if (existingUser) {
             return res.status(409).json({ 
                 error: 'El email ya está registrado' 
             });
         }
 
-        // Insertar el nuevo usuario en la base de datos
+        // si todo es ok hasta hora se procede a registrar
         const { data: newUser, error: insertError } = await supabase
             .from('usuario')
             .insert([
                 { 
                     nombre_usuario: nombre_usuario,
                     email: email,
-                    contrasena: contrasena // IMPORTANTE: En producción deberías hashear la contraseña
+                    contrasena: contrasena 
                 }
             ])
             .select('id_usuario, nombre_usuario, email, fecha_registro');
 
         if (insertError) throw insertError;
 
-        // Devolver los datos del nuevo usuario (sin la contraseña)
+        // ver que el ususario se registro correctamente
         res.status(201).json({
             message: 'Usuario registrado exitosamente',
             usuario: newUser[0]
@@ -149,6 +150,7 @@ app.post('/auth/register', async (req, res) => {
         });
     }
 });
+// endpoint para obtener el ranking de puntajes
 app.get('/ranking', async (req, res) => {
     try {
         const { data, error } = await supabase
@@ -164,7 +166,8 @@ app.get('/ranking', async (req, res) => {
     }
 });
 
-// Nuevo endpoint: Obtener mejores puntuaciones por nivel
+// endpoint: Obtener mejores puntuaciones por nivel
+// NO USADO, la vista de la BD fue descartada
 app.get('/mejores-puntuaciones', async (req, res) => {
     try {
         const { data, error } = await supabase
@@ -178,17 +181,17 @@ app.get('/mejores-puntuaciones', async (req, res) => {
         res.status(500).json({ error: 'Error al obtener las mejores puntuaciones' });
     }
 });
-// Endpoint para obtener puntaje total por email
+// endpint que obtine un mail y retorna la puntuacion del jugador
 app.get('/puntaje-usuario', async (req, res) => {
     try {
         const { email } = req.query;
 
-        // Validar que se proporcionó el email
+        // como siempre, promero ver que el mail fue proporcinado
         if (!email) {
             return res.status(400).json({ error: 'El parámetro email es requerido' });
         }
 
-        // Consultar el usuario por email
+        // consultaremos el usuario por mail
         const { data: usuario, error: usuarioError } = await supabase
             .from('usuario')
             .select('id_usuario, nombre_usuario, email')
@@ -200,7 +203,7 @@ app.get('/puntaje-usuario', async (req, res) => {
             return res.status(404).json({ error: 'Usuario no encontrado' });
         }
 
-        // Consultar el ranking global para obtener el puntaje
+        // vista anking global para obtener el puntaje
         const { data: ranking, error: rankingError } = await supabase
             .from('ranking_global')
             .select('puntuacion_total')
@@ -209,7 +212,7 @@ app.get('/puntaje-usuario', async (req, res) => {
 
         if (rankingError) throw rankingError;
 
-        // Respuesta exitosa
+        // respuesta exitosa
         res.json({
             id_usuario: usuario.id_usuario,
             nombre_usuario: usuario.nombre_usuario,
@@ -225,17 +228,17 @@ app.get('/puntaje-usuario', async (req, res) => {
         });
     }
 });
-// Endpoint para obtener logros de usuario
+// endpoint para obtener los logros de usuario
 app.get('/logros-usuario', async (req, res) => {
     try {
         const { email } = req.query;
 
-        // Validar que se proporcionó el email
+        // como siempre, promero ver que el mail fue proporcinado
         if (!email) {
             return res.status(400).json({ error: 'El parámetro email es requerido' });
         }
 
-        // 1. Obtener el ID del usuario a partir del email
+        // obtener el ID del usuario a partir del email
         const { data: usuario, error: usuarioError } = await supabase
             .from('usuario')
             .select('id_usuario')
@@ -247,14 +250,14 @@ app.get('/logros-usuario', async (req, res) => {
             return res.status(404).json({ error: 'Usuario no encontrado' });
         }
 
-        // 2. Obtener TODOS los logros disponibles
+        // Obtener TODOS los logros disponibles
         const { data: todosLogros, error: logrosError } = await supabase
             .from('logro')
             .select('id_logro, nombre_logro');
 
         if (logrosError) throw logrosError;
 
-        // 3. Obtener los logros desbloqueados por el usuario
+        // obtener los logros desbloqueados por el usuario
         const { data: logrosDesbloqueados, error: desbloqueadosError } = await supabase
             .from('usuario_logro')
             .select('id_logro')
@@ -262,10 +265,10 @@ app.get('/logros-usuario', async (req, res) => {
 
         if (desbloqueadosError) throw desbloqueadosError;
 
-        // Crear un Set con los IDs de logros desbloqueados para búsqueda rápida
+        // almacenar los ids de los logros desbloqueados (esto sirve en el siguiente trozo)
         const desbloqueadosSet = new Set(logrosDesbloqueados.map(l => l.id_logro));
 
-        // 4. Construir la respuesta con todos los logros y su estado
+        // construir la respuesta con todos los logros y su estado
         const respuesta = todosLogros.map(logro => ({
             id_logro: logro.id_logro,
             nombre_logro: logro.nombre_logro,
@@ -282,19 +285,19 @@ app.get('/logros-usuario', async (req, res) => {
         });
     }
 });
-// Endpoint para desbloquear un logro para un usuario
+// endpoint para desbloquear un logro para un usuario
 app.post('/desbloquear-logro', async (req, res) => {
     try {
         const { email, id_logro } = req.body;
 
-        // Validar que se proporcionaron los datos requeridos
+        // como siempre, promero ver que el mail fue proporcinado (y el logro tambien)
         if (!email || !id_logro) {
             return res.status(400).json({ 
                 error: 'Los campos email e id_logro son requeridos' 
             });
         }
 
-        // 1. Obtener el ID del usuario a partir del email
+        // obtener el ID del usuario a partir del email
         const { data: usuario, error: usuarioError } = await supabase
             .from('usuario')
             .select('id_usuario')
@@ -306,7 +309,7 @@ app.post('/desbloquear-logro', async (req, res) => {
             return res.status(404).json({ error: 'Usuario no encontrado' });
         }
 
-        // 2. Verificar que el logro existe
+        // verificar que el logro existe
         const { data: logro, error: logroError } = await supabase
             .from('logro')
             .select('id_logro')
@@ -318,7 +321,7 @@ app.post('/desbloquear-logro', async (req, res) => {
             return res.status(404).json({ error: 'Logro no encontrado' });
         }
 
-        // 3. Verificar si el usuario ya tiene el logro
+        // caso: el usuario ya tiene el logro?
         const { data: logroExistente, error: existenteError } = await supabase
             .from('usuario_logro')
             .select('id_logro')
@@ -336,7 +339,7 @@ app.post('/desbloquear-logro', async (req, res) => {
             });
         }
 
-        // 4. Insertar el nuevo registro en usuario_logro
+        // caso: Insertar el nuevo registro en usuario_logro
         const { data: nuevoLogro, error: insertError } = await supabase
             .from('usuario_logro')
             .insert([
@@ -349,7 +352,7 @@ app.post('/desbloquear-logro', async (req, res) => {
 
         if (insertError) throw insertError;
 
-        // 5. Respuesta exitosa
+        // respuesta exitosa
         res.status(201).json({
             message: 'Logro desbloqueado exitosamente',
             logro_desbloqueado: nuevoLogro[0]
@@ -367,14 +370,14 @@ app.get('/configuracion-usuario', async (req, res) => {
     try {
         const { email } = req.query;
 
-        // Validar que se proporcionó el email
+        // como siempre, promero ver que el mail fue proporcinado 
         if (!email) {
             return res.status(400).json({ 
                 error: 'El parámetro email es requerido' 
             });
         }
 
-        // 1. Obtener el ID del usuario a partir del email
+        // obtener el ID del usuario a partir del email
         const { data: usuario, error: usuarioError } = await supabase
             .from('usuario')
             .select('id_usuario')
@@ -388,7 +391,7 @@ app.get('/configuracion-usuario', async (req, res) => {
             });
         }
 
-        // 2. Obtener la configuración del usuario
+        // obtener configuracion del usuario
         const { data: configuracion, error: configError } = await supabase
             .from('configuracion_usuario')
             .select(`
@@ -401,7 +404,7 @@ app.get('/configuracion-usuario', async (req, res) => {
 
         if (configError && configError.code !== 'PGRST116') throw configError;
 
-        // Si no existe configuración, devolver valores por defecto
+        // valores por defecto en caso de no tener configo
         if (!configuracion) {
             return res.json({
                 volumen_musica: 1.0,
@@ -411,7 +414,7 @@ app.get('/configuracion-usuario', async (req, res) => {
             });
         }
 
-        // 3. Devolver la configuración encontrada
+        // configuración encontrada
         res.json(configuracion);
 
     } catch (error) {
@@ -483,12 +486,12 @@ app.put('/actualizar-configuracion', async (req, res) => {
         });
     }
 });
-// Endpoint para acumular puntuación
+// endpoint para acumular puntuación
 app.post('/acumular-puntuacion', async (req, res) => {
     try {
         const { email, id_nivel, puntos } = req.body;
 
-        // Validar datos de entrada
+        // como siempre, promero ver que el mail fue proporcinado 
         if (!email || !id_nivel || puntos === undefined) {
             return res.status(400).json({ 
                 error: 'Los campos email, id_nivel y puntos son requeridos' 
@@ -501,7 +504,7 @@ app.post('/acumular-puntuacion', async (req, res) => {
             });
         }
 
-        // 1. Obtener el ID del usuario a partir del email
+        // ID del usuario a partir del email
         const { data: usuario, error: usuarioError } = await supabase
             .from('usuario')
             .select('id_usuario')
@@ -515,7 +518,7 @@ app.post('/acumular-puntuacion', async (req, res) => {
             });
         }
 
-        // 2. Verificar que el nivel existe
+        // existe ususrio?
         const { data: nivel, error: nivelError } = await supabase
             .from('nivel')
             .select('id_nivel')
@@ -529,7 +532,7 @@ app.post('/acumular-puntuacion', async (req, res) => {
             });
         }
 
-        // 3. Obtener la puntuación actual si existe
+        // puntuacion actual
         const { data: puntuacionActual, error: puntuacionError } = await supabase
             .from('puntuacion')
             .select('puntos')
@@ -543,14 +546,16 @@ app.post('/acumular-puntuacion', async (req, res) => {
             parseInt(puntuacionActual.puntos) + parseInt(puntos) : 
             parseInt(puntos);
 
-        // 4. Insertar o actualizar la puntuación
+        // insertar o actualizar la puntuación
         const { data: nuevaPuntuacion, error: upsertError } = await supabase
             .from('puntuacion')
             .upsert({
                 id_usuario: usuario.id_usuario,
                 id_nivel: id_nivel,
                 puntos: nuevosPuntos,
-                fecha: new Date().toISOString() // Actualizar la fecha
+                fecha: new Date().toISOString() 
+                //NOTA no estamos usando la fecha en ninguna parte del proyecto
+                //EN su momento se penso que este dato serviria de algo
             }, {
                 onConflict: 'id_usuario,id_nivel'
             })
@@ -558,7 +563,7 @@ app.post('/acumular-puntuacion', async (req, res) => {
 
         if (upsertError) throw upsertError;
 
-        // 5. Respuesta exitosa
+        //respuesta exitosa
         res.status(200).json({
             message: 'Puntuación acumulada exitosamente',
             id_usuario: usuario.id_usuario,
@@ -577,7 +582,8 @@ app.post('/acumular-puntuacion', async (req, res) => {
         });
     }
 });
-// Añade esta función para generar contraseña provisional
+
+// de aqui comienza la dolorosa busqueda de enviar mail al usuario
 function generarContrasenaProvisional() {
   const caracteres = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   let contrasena = '';
@@ -587,14 +593,14 @@ function generarContrasenaProvisional() {
   return contrasena;
 }
 function hashPassword(password) {
-  // Crear hash SHA-256 (igual que en Godot)
+  // hash SHA-256 (Godot se esta usando la misma encriptacion)
   const hash = crypto.createHash('sha256');
   hash.update(password);
   return hash.digest('hex');
 }
 
 
-// Configuración de MailTrap
+// configuracion de  servicio MailTrap
 const transporter = nodemailer.createTransport({
   host: process.env.MAILTRAP_HOST,
   port: process.env.MAILTRAP_PORT,
@@ -769,9 +775,9 @@ app.post('/verificar-credenciales', async (req, res) => {
         });
     }
 });
-// Endpoint para actualizar contraseña (recibe hash desde la app)
-// Endpoint para actualizar contraseña (adaptado a tu estructura de tabla)
-// Endpoint para actualizar contraseña (adaptado a tu estructura de tabla)
+// Endpoint para actualizar contraseña
+//  NOTA: RECORDAR QUE LA CONTRASEÑA SE ENCRIPTA EN LA APP
+
 app.put('/actualizar-contrasena', async (req, res) => {
     try {
         const { email, contrasenaHash } = req.body;
