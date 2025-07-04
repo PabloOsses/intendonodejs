@@ -664,7 +664,6 @@ app.post('/auth/olvide-contrasena', async (req, res) => {
           <p style="font-size: 14px; color: #4a5568;">Por seguridad, te recomendamos:</p>
           <ol style="font-size: 14px; color: #4a5568; padding-left: 20px;">
             <li>Iniciar sesión con esta contraseña</li>
-            <li>Ir a tu perfil</li>
             <li>Cambiarla inmediatamente por una personalizada</li>
           </ol>
           
@@ -675,10 +674,7 @@ app.post('/auth/olvide-contrasena', async (req, res) => {
       `,
       text: `Recuperación de Contraseña - Menti Activa\n\n` +
             `Tu contraseña provisional es: ${contrasenaProvisional}\n\n` +
-            `Por seguridad, te recomendamos:\n` +
-            `1. Iniciar sesión con esta contraseña\n` +
-            `2. Ir a tu perfil\n` +
-            `3. Cambiarla inmediatamente por una personalizada\n\n` +
+            `Para reiniciar tu contraseña, escribe la contraseña temporal según instrucciones de la aplicación\n` +
             `Si no solicitaste este cambio, por favor ignora este mensaje.`
     };
 
