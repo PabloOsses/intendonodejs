@@ -664,7 +664,7 @@ app.post('/auth/olvide-contrasena', async (req, res) => {
           <p style="font-size: 14px; color: #4a5568;">Por seguridad, te recomendamos:</p>
           <ol style="font-size: 14px; color: #4a5568; padding-left: 20px;">
             <li>Iniciar sesión con esta contraseña</li>
-            <li>Cambiarla inmediatamente por una personalizada</li>
+            <li>Cambiarla inmediatamente por una personalizada, según instrucciones de la aplicación</li>
           </ol>
           
           <p style="font-size: 14px; color: #718096; margin-top: 30px;">
